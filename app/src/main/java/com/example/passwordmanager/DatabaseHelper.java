@@ -17,19 +17,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_SITE = "site_name";
     public static final String COLUMN_USERNAME = "username";
     public static final String COLUMN_PASSWORD = "password";
-
+    public static final String COLUMN_NOTES = "notes";
     public DatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        // This SQL query creates the table when the app runs for the first time
         String createTable = "CREATE TABLE " + TABLE_NAME + " (" +
                 COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 COLUMN_SITE + " TEXT, " +
                 COLUMN_USERNAME + " TEXT, " +
-                COLUMN_PASSWORD + " TEXT)";
+                COLUMN_PASSWORD + " TEXT, " +
+                COLUMN_NOTES + " TEXT)";
         db.execSQL(createTable);
     }
 
@@ -42,12 +42,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // --- Core Operations (CRUD) ---
 
     // 1. ADD a new entry
-    public boolean insertEntry(String site, String username, String password) {
+    public boolean insertEntry(String site, String username, String password, String notes) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues contentValues = new ContentValues();
         contentValues.put(COLUMN_SITE, site);
         contentValues.put(COLUMN_USERNAME, username);
-        contentValues.put(COLUMN_PASSWORD, password); // We will leave this as plain text for now to ensure MVP works
+        contentValues.put(COLUMN_PASSWORD, password);
+        contentValues.put(COLUMN_NOTES, notes);
 
         long result = db.insert(TABLE_NAME, null, contentValues);
         return result != -1; // returns true if successful
@@ -60,12 +61,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     // 3. UPDATE an entry
-    public boolean updateEntry(String id, String site, String username, String password) {
+    public boolean updateEntry(String id, String site, String username, String password, String notes) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues contentValues = new ContentValues();
         contentValues.put(COLUMN_SITE, site);
         contentValues.put(COLUMN_USERNAME, username);
         contentValues.put(COLUMN_PASSWORD, password);
+        contentValues.put(COLUMN_NOTES, notes); // <-- ADD THIS
 
         int result = db.update(TABLE_NAME, contentValues, COLUMN_ID + " = ?", new String[]{id});
         return result > 0;

@@ -32,26 +32,27 @@ public class PasswordAdapter extends RecyclerView.Adapter<PasswordAdapter.ViewHo
             return;
         }
 
-        // Extract all data from the database for this row
+// Extract all data from the database for this row
         String id = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_ID));
         String siteName = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_SITE));
         String username = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_USERNAME));
         String password = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_PASSWORD));
+        // ADD THIS LINE:
+        String notes = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COLUMN_NOTES));
 
-        // Put the visible data into the text views
         holder.tvRowId.setText(id);
         holder.tvRowSiteName.setText(siteName);
 
-        // Make the entire row clickable
         holder.itemView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // Package the data and send it to AddEditActivity
                 Intent intent = new Intent(context, AddEditActivity.class);
                 intent.putExtra("ENTRY_ID", id);
                 intent.putExtra("ENTRY_SITE", siteName);
                 intent.putExtra("ENTRY_USERNAME", username);
                 intent.putExtra("ENTRY_PASSWORD", password);
+                // ADD THIS LINE:
+                intent.putExtra("ENTRY_NOTES", notes);
                 context.startActivity(intent);
             }
         });
