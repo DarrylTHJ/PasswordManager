@@ -13,6 +13,19 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.os.Handler;
+import android.os.Looper;
+import android.widget.LinearLayout;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.json.JSONObject;
 
 public class AddEditActivity extends AppCompatActivity {
 
@@ -42,6 +55,15 @@ public class AddEditActivity extends AppCompatActivity {
         CheckBox cbShowPassword = findViewById(R.id.cbShowPassword);
 
         databaseHelper = new DatabaseHelper(this);
+
+        Button btnGenerate = findViewById(R.id.btnGenerate);
+
+        btnGenerate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showAIPromptDialog();
+            }
+        });
 
         // --- FEATURE: Password Visibility Toggle ---
         cbShowPassword.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -139,4 +161,99 @@ public class AddEditActivity extends AppCompatActivity {
             }
         });
     }
+
+    // 1. Show a popup asking the user what kind of password they want
+    private void showAIPromptDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("AI Password Generator");
+        builder.setMessage("What should the password be about?");
+
+        final EditText input = new EditText(this);
+        input.setHint("e.g., my dog Tim");
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setPadding(50, 20, 50, 20);
+        layout.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        builder.setView(layout);
+
+        builder.setPositiveButton("Generate", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String userPrompt = input.getText().toString().trim();
+                if (!userPrompt.isEmpty()) {
+                    etPassword.setText("Generating...");
+                    callLLMAPI(userPrompt);
+                }
+            }
+        });
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+
+    // 2. Make the background network call to the LLM
+    private void callLLMAPI(String userContext) {
+        // We use an ExecutorService because Android blocks network calls on the main UI thread
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Handler handler = new Handler(Looper.getMainLooper());
+
+        executor.execute(() -> {
+            String generatedPassword = "";
+            try {
+                // --- SETUP FOR GEMINI API --
+                String apiKey = "AIzaSyDVmifbrnY8IvaFjYkEby52Fod0IaBiQ8c";
+                URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey);
+
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+
+                // We instruct the LLM to act strictly as a password generator
+                String systemPrompt = "You are a secure password generator. Create a strong, 12-16 character password incorporating the user's concept: '" + userContext + "'. You MUST strictly include at least two numbers and two special characters (e.g., !@#$%^&*). Mix uppercase and lowercase letters. Return ONLY the raw password string with absolutely no extra text, quotes, or markdown.";
+
+                String jsonInputString = "{\"contents\": [{\"parts\":[{\"text\": \"" + systemPrompt + "\"}]}]}";
+
+                // Send the request
+                try(OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonInputString.getBytes("utf-8");
+                    os.write(input, 0, input.length);
+                }
+
+                // Read the response
+                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
+                StringBuilder response = new StringBuilder();
+                String responseLine;
+                while ((responseLine = br.readLine()) != null) {
+                    response.append(responseLine.trim());
+                }
+
+                // Parse the JSON to grab just the text
+                JSONObject jsonObject = new JSONObject(response.toString());
+                generatedPassword = jsonObject.getJSONArray("candidates")
+                        .getJSONObject(0)
+                        .getJSONObject("content")
+                        .getJSONArray("parts")
+                        .getJSONObject(0)
+                        .getString("text").trim();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                generatedPassword = "Error: Check Logcat";
+            }
+
+            // Send the result back to the main UI thread to update the text box
+            final String finalPassword = generatedPassword;
+            handler.post(() -> {
+                etPassword.setText(finalPassword);
+                // Automatically switch input type so the user can see the generated password
+                etPassword.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+                CheckBox cbShowPassword = findViewById(R.id.cbShowPassword);
+                if (cbShowPassword != null) cbShowPassword.setChecked(true);
+            });
+        });
+    }
+
+
+
 }
