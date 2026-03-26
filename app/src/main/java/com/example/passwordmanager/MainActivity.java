@@ -1,11 +1,13 @@
-package com.example.passwordmanager;
-
+package com.example.passwordmanager; // Ensure this matches yours!
 
 import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -15,18 +17,18 @@ public class MainActivity extends AppCompatActivity {
     private DatabaseHelper databaseHelper;
     private PasswordAdapter adapter;
     private RecyclerView recyclerView;
+    private EditText etSearch;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Initialize Database and UI
         databaseHelper = new DatabaseHelper(this);
         recyclerView = findViewById(R.id.recyclerViewPasswords);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        etSearch = findViewById(R.id.etSearch);
 
-        // Setup the + ADD button
         Button btnAdd = findViewById(R.id.btnAdd);
         btnAdd.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -36,15 +38,29 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Setup the Log Out button
         Button btnLogOut = findViewById(R.id.btnLogOut);
         btnLogOut.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Intent intent = new Intent(MainActivity.this, LoginActivity.class);
                 startActivity(intent);
-                finish(); // Destroys MainActivity so the user cannot press "Back" to get in
+                finish();
             }
+        });
+
+        // --- LIVE SEARCH LOGIC ---
+        etSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // This triggers every time a letter is typed or deleted
+                filterList(s.toString());
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
         });
 
         loadDatabaseData();
@@ -53,7 +69,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // This ensures the list automatically refreshes when you come back from adding a password
+        // Clear search and reload all data when coming back from adding/editing
+        if (etSearch != null) etSearch.setText("");
         loadDatabaseData();
     }
 
@@ -63,6 +80,20 @@ public class MainActivity extends AppCompatActivity {
             adapter = new PasswordAdapter(this, cursor);
             recyclerView.setAdapter(adapter);
         } else {
+            adapter.swapCursor(cursor);
+        }
+    }
+
+    // Helper method to swap the list data based on the search word
+    private void filterList(String keyword) {
+        Cursor cursor;
+        if (keyword.isEmpty()) {
+            cursor = databaseHelper.getAllEntries();
+        } else {
+            cursor = databaseHelper.searchEntries(keyword);
+        }
+
+        if (adapter != null) {
             adapter.swapCursor(cursor);
         }
     }

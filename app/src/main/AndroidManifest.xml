@@ -13,6 +13,7 @@
         android:theme="@style/Theme.PasswordManager">
         <activity
             android:name=".AddEditActivity"
+            android:parentActivityName=".MainActivity"
             android:exported="false" />
         <activity
             android:name=".LoginActivity"

@@ -9,7 +9,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "passwords.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2;
 
     // Table name and columns
     public static final String TABLE_NAME = "password_entries";
@@ -77,5 +77,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public Integer deleteEntry(String id) {
         SQLiteDatabase db = this.getWritableDatabase();
         return db.delete(TABLE_NAME, COLUMN_ID + " = ?", new String[]{id});
+    }
+
+    // 5. SEARCH entries
+    public Cursor searchEntries(String keyword) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        // The % signs act as wildcards, so searching "book" will find "Facebook"
+        String query = "SELECT * FROM " + TABLE_NAME + " WHERE " + COLUMN_SITE + " LIKE ?";
+        return db.rawQuery(query, new String[]{"%" + keyword + "%"});
     }
 }

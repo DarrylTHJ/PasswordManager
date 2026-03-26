@@ -24,11 +24,24 @@
         style="?android:attr/borderlessButtonStyle"
         android:textColor="#F44336"/>
 
+    <EditText
+        android:id="@+id/etSearch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tvTitle"
+        android:layout_marginBottom="12dp"
+        android:background="#EEEEEE"
+        android:padding="12dp"
+        android:hint="Search by Site Name..."
+        android:inputType="text"
+        android:drawableStart="@android:drawable/ic_menu_search"
+        android:drawablePadding="8dp"/>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerViewPasswords"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/tvTitle" />
+        android:layout_below="@id/etSearch" />
 
     <Button
         android:id="@+id/btnAdd"

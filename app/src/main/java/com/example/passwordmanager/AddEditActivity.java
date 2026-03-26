@@ -32,6 +32,13 @@ public class AddEditActivity extends AppCompatActivity {
         Button btnSave = findViewById(R.id.btnSave);
         Button btnDelete = findViewById(R.id.btnDelete);
         Button btnCopy = findViewById(R.id.btnCopy);
+        Button btnBack = findViewById(R.id.btnBack);
+        btnBack.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                finish(); // This instantly closes the screen and goes back
+            }
+        });
         CheckBox cbShowPassword = findViewById(R.id.cbShowPassword);
 
         databaseHelper = new DatabaseHelper(this);
