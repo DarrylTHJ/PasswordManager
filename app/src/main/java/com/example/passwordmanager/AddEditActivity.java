@@ -1,23 +1,29 @@
 package com.example.passwordmanager;
 
+import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
-import android.os.Handler;
-import android.os.Looper;
-import android.widget.LinearLayout;
+
+import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -25,7 +31,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.json.JSONObject;
 
 public class AddEditActivity extends AppCompatActivity {
 
@@ -45,23 +50,17 @@ public class AddEditActivity extends AppCompatActivity {
         Button btnSave = findViewById(R.id.btnSave);
         Button btnDelete = findViewById(R.id.btnDelete);
         Button btnCopy = findViewById(R.id.btnCopy);
+        Button btnGenerate = findViewById(R.id.btnGenerate);
         Button btnBack = findViewById(R.id.btnBack);
-        btnBack.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                finish(); // This instantly closes the screen and goes back
-            }
-        });
         CheckBox cbShowPassword = findViewById(R.id.cbShowPassword);
 
         databaseHelper = new DatabaseHelper(this);
 
-        Button btnGenerate = findViewById(R.id.btnGenerate);
-
-        btnGenerate.setOnClickListener(new View.OnClickListener() {
+        // --- FEATURE: Back Button ---
+        btnBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showAIPromptDialog();
+                finish();
             }
         });
 
@@ -70,13 +69,11 @@ public class AddEditActivity extends AppCompatActivity {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
-                    // Show Password
                     etPassword.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
                 } else {
-                    // Hide Password
                     etPassword.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
                 }
-                etPassword.setSelection(etPassword.getText().length()); // Keep cursor at the end
+                etPassword.setSelection(etPassword.getText().length());
             }
         });
 
@@ -94,6 +91,28 @@ public class AddEditActivity extends AppCompatActivity {
             }
         });
 
+        // --- FEATURE: Live Password Strength Checker ---
+        etPassword.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                checkPasswordStrength(s.toString());
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        // --- FEATURE: AI Password Generator ---
+        btnGenerate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showAIPromptDialog();
+            }
+        });
+
         // Load existing data if EDITING
         Intent intent = getIntent();
         if (intent.hasExtra("ENTRY_ID")) {
@@ -104,7 +123,6 @@ public class AddEditActivity extends AppCompatActivity {
             String decryptedPassword = EncryptionUtils.decrypt(intent.getStringExtra("ENTRY_PASSWORD"));
             etPassword.setText(decryptedPassword);
 
-            // Load Notes (if they exist)
             if(intent.hasExtra("ENTRY_NOTES")) {
                 etNotes.setText(intent.getStringExtra("ENTRY_NOTES"));
             }
@@ -162,7 +180,47 @@ public class AddEditActivity extends AppCompatActivity {
         });
     }
 
-    // 1. Show a popup asking the user what kind of password they want
+    // ==========================================
+    // HELPER METHODS
+    // ==========================================
+
+    private void checkPasswordStrength(String password) {
+        TextView tvStrength = findViewById(R.id.tvPasswordStrength);
+
+        if (password == null || password.isEmpty()) {
+            tvStrength.setVisibility(View.GONE);
+            return;
+        }
+
+        tvStrength.setVisibility(View.VISIBLE);
+        int score = 0;
+
+        if (password.length() >= 8) score++;
+        if (password.matches(".*[A-Z].*")) score++;
+        if (password.matches(".*[0-9].*")) score++;
+        if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) score++;
+
+        switch (score) {
+            case 0:
+            case 1:
+                tvStrength.setText("Strength: Weak");
+                tvStrength.setTextColor(android.graphics.Color.parseColor("#F44336"));
+                break;
+            case 2:
+                tvStrength.setText("Strength: Fair");
+                tvStrength.setTextColor(android.graphics.Color.parseColor("#FF9800"));
+                break;
+            case 3:
+                tvStrength.setText("Strength: Good");
+                tvStrength.setTextColor(android.graphics.Color.parseColor("#2196F3"));
+                break;
+            case 4:
+                tvStrength.setText("Strength: Strong");
+                tvStrength.setTextColor(android.graphics.Color.parseColor("#4CAF50"));
+                break;
+        }
+    }
+
     private void showAIPromptDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("AI Password Generator");
@@ -191,17 +249,14 @@ public class AddEditActivity extends AppCompatActivity {
         builder.show();
     }
 
-    // 2. Make the background network call to the LLM
     private void callLLMAPI(String userContext) {
-        // We use an ExecutorService because Android blocks network calls on the main UI thread
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Handler handler = new Handler(Looper.getMainLooper());
 
         executor.execute(() -> {
             String generatedPassword = "";
             try {
-                // --- SETUP FOR GEMINI API --
-                String apiKey = "AIzaSyDVmifbrnY8IvaFjYkEby52Fod0IaBiQ8c";
+                String apiKey = "INSERT AI KEY HERE";
                 URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey);
 
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -209,51 +264,55 @@ public class AddEditActivity extends AppCompatActivity {
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
 
-                // We instruct the LLM to act strictly as a password generator
-                String systemPrompt = "You are a secure password generator. Create a strong, 12-16 character password incorporating the user's concept: '" + userContext + "'. You MUST strictly include at least two numbers and two special characters (e.g., !@#$%^&*). Mix uppercase and lowercase letters. Return ONLY the raw password string with absolutely no extra text, quotes, or markdown.";
+                String safeContext = userContext.replace("\"", "").replace("\\", "");
+                String systemPrompt = "You are a secure password generator. Create a strong, 12-16 character password incorporating the user's concept: '" + safeContext + "'. You MUST strictly include at least two numbers and two special characters (e.g., !@#$%^&*). Mix uppercase and lowercase letters. Return ONLY the raw password string with absolutely no extra text, quotes, or markdown.";
 
                 String jsonInputString = "{\"contents\": [{\"parts\":[{\"text\": \"" + systemPrompt + "\"}]}]}";
 
-                // Send the request
                 try(OutputStream os = conn.getOutputStream()) {
                     byte[] input = jsonInputString.getBytes("utf-8");
                     os.write(input, 0, input.length);
                 }
 
-                // Read the response
-                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
+                int responseCode = conn.getResponseCode();
+                java.io.InputStream stream;
+                if (responseCode >= 200 && responseCode <= 299) {
+                    stream = conn.getInputStream();
+                } else {
+                    stream = conn.getErrorStream();
+                }
+
+                BufferedReader br = new BufferedReader(new InputStreamReader(stream, "utf-8"));
                 StringBuilder response = new StringBuilder();
                 String responseLine;
                 while ((responseLine = br.readLine()) != null) {
                     response.append(responseLine.trim());
                 }
 
-                // Parse the JSON to grab just the text
-                JSONObject jsonObject = new JSONObject(response.toString());
-                generatedPassword = jsonObject.getJSONArray("candidates")
-                        .getJSONObject(0)
-                        .getJSONObject("content")
-                        .getJSONArray("parts")
-                        .getJSONObject(0)
-                        .getString("text").trim();
+                if (responseCode >= 200 && responseCode <= 299) {
+                    JSONObject jsonObject = new JSONObject(response.toString());
+                    generatedPassword = jsonObject.getJSONArray("candidates")
+                            .getJSONObject(0)
+                            .getJSONObject("content")
+                            .getJSONArray("parts")
+                            .getJSONObject(0)
+                            .getString("text").trim();
+                } else {
+                    generatedPassword = "API Error " + responseCode + ": " + response.toString();
+                }
 
             } catch (Exception e) {
                 e.printStackTrace();
-                generatedPassword = "Error: Check Logcat";
+                generatedPassword = "App Error: " + e.getMessage();
             }
 
-            // Send the result back to the main UI thread to update the text box
             final String finalPassword = generatedPassword;
             handler.post(() -> {
                 etPassword.setText(finalPassword);
-                // Automatically switch input type so the user can see the generated password
                 etPassword.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
                 CheckBox cbShowPassword = findViewById(R.id.cbShowPassword);
                 if (cbShowPassword != null) cbShowPassword.setChecked(true);
             });
         });
     }
-
-
-
 }

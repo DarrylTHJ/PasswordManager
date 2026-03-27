@@ -70,6 +70,6 @@ public class LoginActivity extends AppCompatActivity {
     private void goToMain() {
         Intent intent = new Intent(LoginActivity.this, MainActivity.class);
         startActivity(intent);
-        finish(); // Closes LoginActivity so user can't press 'back' to bypass it
+        finish();
     }
 }

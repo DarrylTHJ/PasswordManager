@@ -1,4 +1,4 @@
-package com.example.passwordmanager; // Ensure this matches yours!
+package com.example.passwordmanager;
 
 import android.content.Intent;
 import android.database.Cursor;

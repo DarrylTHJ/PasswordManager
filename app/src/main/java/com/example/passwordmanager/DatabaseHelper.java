@@ -67,7 +67,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         contentValues.put(COLUMN_SITE, site);
         contentValues.put(COLUMN_USERNAME, username);
         contentValues.put(COLUMN_PASSWORD, password);
-        contentValues.put(COLUMN_NOTES, notes); // <-- ADD THIS
+        contentValues.put(COLUMN_NOTES, notes);
 
         int result = db.update(TABLE_NAME, contentValues, COLUMN_ID + " = ?", new String[]{id});
         return result > 0;
